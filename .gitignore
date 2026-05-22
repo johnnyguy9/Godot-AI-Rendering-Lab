@@ -1,0 +1,12 @@
+.godot/
+.import/
+export/
+exports/
+*.translation
+*.tmp
+*.log
+*.pck
+*.exe
+*.dmg
+*.zip
+*.7z

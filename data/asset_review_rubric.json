@@ -1,0 +1,31 @@
+{
+  "name": "Digital Asset Review Rubric",
+  "purpose": "Demonstrates how simulation assets are judged for AI rendering, gameplay readability, and production polish.",
+  "criteria": [
+    {
+      "id": "silhouette_readability",
+      "weight": 0.24,
+      "description": "Assets must remain recognizable from the review camera and during agent motion."
+    },
+    {
+      "id": "material_language",
+      "weight": 0.22,
+      "description": "Color, roughness, metallic response, and emissive accents communicate function without labels."
+    },
+    {
+      "id": "navigation_affordance",
+      "weight": 0.2,
+      "description": "Asset scale and clearance must support autonomous steering without visual ambiguity."
+    },
+    {
+      "id": "telemetry_value",
+      "weight": 0.18,
+      "description": "The asset should produce meaningful inspection or perception events for AI evaluation."
+    },
+    {
+      "id": "render_budget_awareness",
+      "weight": 0.16,
+      "description": "Procedural assets should read well while staying lightweight enough for interactive iteration."
+    }
+  ]
+}
