@@ -215,6 +215,16 @@ func _arrived_at(target: Vector3) -> bool:
 	return flat_delta.length() <= arrival_radius
 
 
+func get_state_name() -> String:
+	return STATE_NAMES[current_state]
+
+
+func distance_to_target() -> float:
+	var flat_delta := current_target - global_position
+	flat_delta.y = 0.0
+	return flat_delta.length()
+
+
 func _transition_to(next_state: int, reason: String) -> void:
 	var previous_state := current_state
 	current_state = next_state

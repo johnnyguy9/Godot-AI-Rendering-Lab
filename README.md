@@ -1,30 +1,20 @@
 # Godot AI Rendering Lab
 
-An expert-level Godot 4 demo built to showcase practical game-development, interactive-systems, AI behavior, procedural asset, and rendering-review skills for AI gaming and digital asset refinement roles.
+A Godot 4 portfolio demo for real-time AI behavior, procedural digital assets, field-of-view perception, steering, live evaluation telemetry, and rendering-review workflows.
 
-## Why This Exists
+## Executive Summary
 
-The target signal is simple: when someone reviews this repository, they should see that the developer can build in Godot, reason about autonomous agents, create readable digital assets, expose useful telemetry, and judge whether a simulation is visually and mechanically working.
+This project is built to be evaluated quickly by a technical reviewer. It is not a static scene or a toy script. It is a running Godot simulation where autonomous agents patrol a digital twin, perceive targets through visible FOV cones, respond to inspection beacons, avoid procedural assets, and report their reasoning through a live HUD.
 
-This project is intentionally not a static scene. It is a live AI rendering lab:
+Core signals:
 
-- Three autonomous agents patrol a procedural digital twin.
-- Agents use a finite state machine with `Patrol`, `Seek`, and `Idle` states.
-- Each agent has field-of-view perception and locks onto sensor beacons.
-- Steering combines target pursuit, obstacle avoidance, boundary correction, and peer separation.
-- The environment is built from procedural digital assets with material language and clearance semantics.
-- A live evaluation HUD reports transitions, FOV locks, vector samples, and asset quality data.
-
-## Portfolio Fit
-
-This repository maps directly to the kind of experience requested by game-development and AI rendering teams:
-
-- Godot implementation, not just pseudocode.
-- Procedural asset construction and material styling.
-- Multi-agent behavior with readable AI state transitions.
-- Runtime telemetry for debugging and judging simulation quality.
-- A digital twin style environment designed for inspection and refinement.
-- Clear architecture that separates rendering, environment semantics, agent logic, and review UI.
+- Godot 4 project structure with a real `project.godot` entry point.
+- Multi-agent finite state machine: `Patrol`, `Seek`, `Idle`.
+- Forward field-of-view perception.
+- Blended steering: pursuit, obstacle avoidance, boundary bias, and peer separation.
+- Procedural asset construction with material language and clearance semantics.
+- Runtime evaluation HUD for state counts, vector samples, asset score, and review events.
+- Asset rubric data separated from rendering code.
 
 ## Controls
 
@@ -35,100 +25,108 @@ This repository maps directly to the kind of experience requested by game-develo
 ## System Architecture
 
 ```text
-Main Scene
-├── SimulationApplication setup
-│   ├── WorldEnvironment, lighting, camera
-│   ├── DigitalTwinEnvironment
-│   ├── SimulationDirector
-│   └── Evaluation HUD
-├── DigitalTwinEnvironment
-│   ├── Procedural floor and grid
-│   ├── Digital asset blocks with emissive accents
-│   ├── Navigation bounds and obstacle clearances
-│   ├── Sensor beacons
-│   └── Asset review rubric
-├── AutonomousAgent
-│   ├── FSM: Patrol, Seek, Idle
-│   ├── FOV perception cone
-│   ├── Steering vectors
-│   ├── Boundary correction
-│   └── Console telemetry
-└── DebugHud
-    ├── Runtime metrics
-    ├── Vector sample summaries
-    ├── Asset quality score
-    └── Review event log
+Main
+|-- Rendering setup
+|   |-- WorldEnvironment
+|   |-- Directional and fill lighting
+|   `-- ReviewCamera
+|-- DigitalTwinEnvironment
+|   |-- Procedural floor and grid
+|   |-- Digital asset blocks
+|   |-- Navigation bounds
+|   |-- Sensor beacons
+|   `-- Asset review rubric
+|-- SimulationDirector
+|   |-- Agent spawning
+|   |-- Event aggregation
+|   `-- Metrics snapshots
+|-- AutonomousAgent[]
+|   |-- FSM state
+|   |-- FOV perception volume
+|   |-- Steering vector calculation
+|   `-- Console telemetry
+`-- DebugHud
+    |-- Runtime metrics
+    |-- Agent state counts
+    |-- Latest steering sample
+    `-- Asset quality summary
 ```
 
 ## Core Mechanics
 
 ### Multi-Agent FSM
 
-Each agent runs a finite state machine:
+Each agent owns its state and transition logic:
 
-- `Patrol`: Samples navigable waypoints and roams the digital twin.
-- `Seek`: Locks onto a perceived sensor beacon and moves at a faster response speed.
-- `Idle`: Pauses briefly to create believable cadence and allow route replanning.
+- `Patrol`: Sample a navigable waypoint and roam the digital twin.
+- `Seek`: Lock onto a perceived sensor beacon and respond at a higher movement speed.
+- `Idle`: Pause briefly to create believable cadence and route replanning space.
 
-Transitions are emitted to the console and HUD with the triggering reason, making the AI readable to reviewers.
+Transitions are emitted to both the console and the HUD.
 
-### Field-of-View Perception
+### FOV Perception
 
-Agents do not globally know about every target. They scan for beacons inside a forward-facing FOV cone. This makes perception visual, inspectable, and connected to the rendered scene.
+Agents scan for beacons inside a forward-facing cone. The perception model considers distance, field angle, priority, cooldown, and a small stochastic weight. This makes target acquisition visible and reviewable.
 
-### Steering and Spatial Evaluation
+### Steering
 
-Movement is driven by a blended steering model:
+Movement blends:
 
-- Desired direction toward the active target.
-- Obstacle avoidance around digital assets.
+- Desired target direction.
+- Obstacle repulsion from digital assets.
 - Peer separation between agents.
 - Boundary bias near the navigable limits.
-- Final clamp against the environment bounds.
+- Final clamp against world bounds.
 
-The console logs vector calculations so reviewers can see the agent reasoning loop.
+The latest steering sample is surfaced in the HUD so a reviewer can correlate visible movement with vector math.
 
 ### Digital Asset Review
 
-The project includes `data/asset_review_rubric.json`, which describes how assets are evaluated for readability, material language, navigation affordance, telemetry value, and render budget awareness. The HUD surfaces this as a live quality score.
+The environment includes `data/asset_review_rubric.json`, a compact quality framework for asset readability, material language, navigation affordance, telemetry value, and render-budget awareness. The HUD reports the current asset score and counts.
 
 ## Requirements
 
 - Godot 4.6 or newer.
+- No third-party plugins.
 
-No third-party Godot plugins are required.
+## Run
 
-## Running The Demo
+Open the folder in Godot and press Run.
 
-Open the repository folder in Godot and run the project.
-
-Command-line launch:
+Command-line:
 
 ```powershell
 godot --path .
 ```
 
-If Godot is installed through Winget, the executable is usually available as `godot` after restarting the terminal. The editor executable can also be launched directly from the Winget package folder.
+If installed through Winget, restart the terminal so the `godot` alias is available, or launch the executable directly from the Winget package folder.
 
 ## Files Of Interest
 
-- `scenes/main.tscn`: Main scene entry point.
+- `scenes/main.tscn`: Main scene.
 - `scripts/main.gd`: Rendering setup, camera modes, simulation lifecycle.
-- `scripts/simulation_environment.gd`: Procedural digital twin assets, navigability, beacons, asset review loading.
+- `scripts/simulation_environment.gd`: Procedural assets, navigability, beacons, rubric loading.
 - `scripts/autonomous_agent.gd`: FSM, FOV perception, steering, vector telemetry.
 - `scripts/simulation_director.gd`: Multi-agent orchestration and metrics aggregation.
-- `scripts/debug_hud.gd`: Live review HUD.
+- `scripts/debug_hud.gd`: Live evaluation overlay.
 - `data/asset_review_rubric.json`: Asset-quality framework.
+- `docs/TECHNICAL_REVIEW.md`: Deeper reviewer guide.
 
-## Future Roadmap
+## Validation
 
-- Add screenshot capture and replay export for review packets.
-- Add behavior-tree experiments alongside the FSM.
-- Add navmesh-based path planning for dense asset layouts.
-- Add model import examples for authored GLB assets.
-- Add agentic orchestration hooks for external planners assigning inspection objectives.
-- Add automated visual scoring for digital asset refinement workflows.
+Headless project boot:
 
-## Professional Signal
+```powershell
+godot --headless --path . --quit
+```
 
-This project is designed to show that the developer can do more than assemble a scene. It demonstrates the ability to create a game-system prototype, reason about AI behavior, build digital assets with production constraints, expose evaluation telemetry, and document the work for technical reviewers.
+Expected signal: the console should report three agents transitioning from `Idle` to `Patrol`, followed by the director startup message.
+
+## Roadmap
+
+- Screenshot and replay capture for review packets.
+- Navmesh path planning for denser environments.
+- Behavior-tree variant alongside the FSM.
+- GLB asset import examples with metadata-driven collision descriptors.
+- External planner hooks for assigning inspection objectives.
+- Automated visual and telemetry scoring for digital asset refinement.

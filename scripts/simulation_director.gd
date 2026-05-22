@@ -36,12 +36,36 @@ func get_metrics_snapshot() -> Dictionary:
 	return {
 		"runtime": runtime_seconds,
 		"agents": agents.size(),
+		"state_counts": _state_counts(),
+		"average_target_distance": _average_target_distance(),
 		"transitions": transitions,
 		"perception_locks": perception_locks,
 		"vector_samples": vector_samples,
 		"latest_vector": latest_vector_summary,
 		"asset_review": asset_review,
 	}
+
+
+func _state_counts() -> Dictionary:
+	var counts := {
+		"Patrol": 0,
+		"Seek": 0,
+		"Idle": 0,
+	}
+	for agent in agents:
+		var state_name: String = agent.get_state_name()
+		counts[state_name] = int(counts.get(state_name, 0)) + 1
+	return counts
+
+
+func _average_target_distance() -> float:
+	if agents.is_empty():
+		return 0.0
+
+	var total := 0.0
+	for agent in agents:
+		total += agent.distance_to_target()
+	return total / float(agents.size())
 
 
 func _spawn_agents() -> void:

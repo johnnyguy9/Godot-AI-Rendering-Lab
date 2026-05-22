@@ -86,7 +86,15 @@ func _on_metrics_changed(snapshot: Dictionary) -> void:
 		snapshot["perception_locks"],
 		snapshot["vector_samples"],
 	]
-	latest_vector_label.text = "Latest steering sample: %s" % snapshot["latest_vector"]
+
+	var counts: Dictionary = snapshot.get("state_counts", {})
+	latest_vector_label.text = "States P/S/I %d/%d/%d | Avg target distance %.2fm | Latest steering: %s" % [
+		int(counts.get("Patrol", 0)),
+		int(counts.get("Seek", 0)),
+		int(counts.get("Idle", 0)),
+		float(snapshot.get("average_target_distance", 0.0)),
+		snapshot["latest_vector"],
+	]
 
 	var review: Dictionary = snapshot["asset_review"]
 	var rubric: Dictionary = review.get("rubric", {})
