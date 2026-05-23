@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  headless-boot:
+    name: Godot headless boot check
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot binary
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-4.4-stable-linux-headless
+
+      - name: Install Godot 4 (headless)
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot
+          curl -fL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/4.4-stable/Godot_v4.4-stable_linux.x86_64.zip"
+          unzip -o /tmp/godot.zip -d ~/godot
+          chmod +x ~/godot/Godot_v4.4-stable_linux.x86_64
+
+      - name: Import project (writes .godot cache)
+        run: |
+          ~/godot/Godot_v4.4-stable_linux.x86_64 \
+            --headless --path . --import 2>&1 | tee import.log
+          ! grep -E "ERROR|SCRIPT ERROR" import.log
+
+      - name: Boot project headlessly and quit
+        run: |
+          ~/godot/Godot_v4.4-stable_linux.x86_64 \
+            --headless --path . --quit 2>&1 | tee boot.log
+          ! grep -E "ERROR|SCRIPT ERROR" boot.log
+
+      - name: Upload boot log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-boot-log
+          path: |
+            import.log
+            boot.log
