@@ -136,11 +136,7 @@ func _steer_toward(target: Vector3, speed: float, delta: float) -> Dictionary:
 	var avoidance := _obstacle_avoidance()
 	var separation := _peer_separation()
 	var boundary_bias := _boundary_bias()
-	var steering := desired + avoidance * 1.25 + separation * 0.86 + boundary_bias * 0.78
-	if steering.length() <= 0.001:
-		steering = desired
-	else:
-		steering = steering.normalized()
+	var steering := compose_steering_vector(desired, avoidance, separation, boundary_bias)
 
 	var step_length := minf(speed * delta, distance)
 	var proposed := origin + steering * step_length
@@ -168,45 +164,66 @@ func _steer_toward(target: Vector3, speed: float, delta: float) -> Dictionary:
 
 
 func _obstacle_avoidance() -> Vector3:
+	return calculate_obstacle_avoidance_at(global_position)
+
+
+func calculate_obstacle_avoidance_at(sample_position: Vector3) -> Vector3:
 	var influence := Vector3.ZERO
-	var position_2d := Vector2(global_position.x, global_position.z)
+	var position_2d := Vector2(sample_position.x, sample_position.z)
 	for obstacle in environment.get_obstacles():
 		var obstacle_position: Vector3 = obstacle["position"]
 		var obstacle_2d := Vector2(obstacle_position.x, obstacle_position.z)
 		var distance := position_2d.distance_to(obstacle_2d)
 		var radius: float = obstacle["radius"] + obstacle_clearance + 1.65
 		if distance < radius and distance > 0.001:
-			var away := Vector3(global_position.x - obstacle_position.x, 0.0, global_position.z - obstacle_position.z).normalized()
+			var away := Vector3(sample_position.x - obstacle_position.x, 0.0, sample_position.z - obstacle_position.z).normalized()
 			var strength := 1.0 - clampf(distance / radius, 0.0, 1.0)
 			influence += away * strength
-	return influence.normalized() if influence.length() > 0.001 else Vector3.ZERO
+	return influence
 
 
 func _peer_separation() -> Vector3:
-	var influence := Vector3.ZERO
+	var peer_positions: Array[Vector3] = []
 	for peer in peers:
-		if peer == self:
-			continue
-		var delta: Vector3 = global_position - peer.global_position
+		if peer != self:
+			peer_positions.append(peer.global_position)
+	return calculate_peer_separation_at(global_position, peer_positions)
+
+
+func calculate_peer_separation_at(sample_position: Vector3, peer_positions: Array[Vector3]) -> Vector3:
+	var influence := Vector3.ZERO
+	for peer_position in peer_positions:
+		var delta: Vector3 = sample_position - peer_position
 		delta.y = 0.0
 		var distance: float = delta.length()
 		if distance < 2.05 and distance > 0.001:
 			influence += delta.normalized() * (1.0 - distance / 2.05)
-	return influence.normalized() if influence.length() > 0.001 else Vector3.ZERO
+	return influence
 
 
 func _boundary_bias() -> Vector3:
+	return calculate_boundary_bias_at(global_position)
+
+
+func calculate_boundary_bias_at(sample_position: Vector3) -> Vector3:
 	var bias := Vector3.ZERO
 	var buffer := 2.2
-	if global_position.x < environment.bounds_min.x + buffer:
+	if sample_position.x < environment.bounds_min.x + buffer:
 		bias.x += 1.0
-	if global_position.x > environment.bounds_max.x - buffer:
+	if sample_position.x > environment.bounds_max.x - buffer:
 		bias.x -= 1.0
-	if global_position.z < environment.bounds_min.y + buffer:
+	if sample_position.z < environment.bounds_min.y + buffer:
 		bias.z += 1.0
-	if global_position.z > environment.bounds_max.y - buffer:
+	if sample_position.z > environment.bounds_max.y - buffer:
 		bias.z -= 1.0
 	return bias.normalized() if bias.length() > 0.001 else Vector3.ZERO
+
+
+func compose_steering_vector(desired: Vector3, avoidance: Vector3, separation: Vector3, boundary_bias: Vector3) -> Vector3:
+	var steering := desired + avoidance * 1.25 + separation * 0.86 + boundary_bias * 0.78
+	if steering.length() <= 0.001:
+		return desired.normalized() if desired.length() > 0.001 else Vector3.ZERO
+	return steering.normalized()
 
 
 func _arrived_at(target: Vector3) -> bool:
