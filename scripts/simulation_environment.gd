@@ -93,8 +93,7 @@ func query_beacon_in_fov(origin: Vector3, forward: Vector3, fov_degrees: float, 
 			continue
 
 		var priority: float = beacon["priority"]
-		var distance_weight := 1.0 - clampf(distance / scan_radius, 0.0, 1.0)
-		var score := priority + distance_weight + rng.randf_range(0.0, 0.12)
+		var score := calculate_beacon_score(priority, distance, scan_radius, rng)
 		if score > best_weight:
 			best_weight = score
 			best_beacon = beacon
@@ -102,6 +101,11 @@ func query_beacon_in_fov(origin: Vector3, forward: Vector3, fov_degrees: float, 
 	if not best_beacon.is_empty():
 		_mark_beacon_triggered(best_beacon["id"])
 	return best_beacon
+
+
+func calculate_beacon_score(priority: float, distance: float, scan_radius: float, rng: RandomNumberGenerator) -> float:
+	var distance_weight := 1.0 - clampf(distance / scan_radius, 0.0, 1.0)
+	return priority + distance_weight + rng.randf_range(0.0, 0.12)
 
 
 func _process(delta: float) -> void:
