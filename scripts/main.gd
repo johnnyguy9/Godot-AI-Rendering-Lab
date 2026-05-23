@@ -3,10 +3,14 @@ extends Node3D
 const SimulationEnvironment := preload("res://scripts/simulation_environment.gd")
 const SimulationDirector := preload("res://scripts/simulation_director.gd")
 const DebugHud := preload("res://scripts/debug_hud.gd")
+const ReplayRecorder := preload("res://scripts/replay_recorder.gd")
+const ReplayPlayer := preload("res://scripts/replay_player.gd")
 
 var environment
 var director
 var hud
+var replay_recorder
+var replay_player
 var camera: Camera3D
 var camera_mode := 0
 
@@ -26,6 +30,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_apply_camera_mode()
 	if event.is_action_pressed("toggle_controller") and director:
 		director.toggle_controller()
+	if event.is_action_pressed("toggle_replay") and replay_player:
+		replay_player.toggle_playback()
 
 
 func _configure_rendering() -> void:
@@ -73,11 +79,29 @@ func _build_simulation() -> void:
 	director.name = "SimulationDirector"
 	add_child(director)
 	director.configure(environment)
+	_configure_replay()
 
 	hud = DebugHud.new()
 	hud.name = "EvaluationHUD"
 	add_child(hud)
 	hud.bind(director)
+
+
+func _configure_replay() -> void:
+	var record_path := _get_cli_value("--record")
+	if not record_path.is_empty():
+		replay_recorder = ReplayRecorder.new()
+		replay_recorder.name = "ReplayRecorder"
+		add_child(replay_recorder)
+		if replay_recorder.configure(record_path):
+			director.bind_replay_recorder(replay_recorder)
+
+	replay_player = ReplayPlayer.new()
+	replay_player.name = "ReplayPlayer"
+	add_child(replay_player)
+	var replay_path := _get_cli_value("--replay")
+	if not replay_path.is_empty():
+		replay_player.load_jsonl(replay_path)
 
 
 func _reset_simulation() -> void:
@@ -87,6 +111,11 @@ func _reset_simulation() -> void:
 		director.queue_free()
 	if environment:
 		environment.queue_free()
+	if replay_recorder:
+		replay_recorder.close()
+		replay_recorder.queue_free()
+	if replay_player:
+		replay_player.queue_free()
 	await get_tree().process_frame
 	_build_simulation()
 
@@ -105,3 +134,14 @@ func _apply_camera_mode() -> void:
 		_:
 			camera.position = Vector3(16.0, 10.0, -13.5)
 			camera.look_at(Vector3(0.0, 0.0, 0.0), Vector3.UP)
+
+
+func _get_cli_value(flag: String) -> String:
+	var args := OS.get_cmdline_args() + OS.get_cmdline_user_args()
+	for index in range(args.size()):
+		var arg := str(args[index])
+		if arg == flag and index + 1 < args.size():
+			return str(args[index + 1])
+		if arg.begins_with("%s=" % flag):
+			return arg.substr(flag.length() + 1)
+	return ""

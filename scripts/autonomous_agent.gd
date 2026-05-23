@@ -32,6 +32,7 @@ var navigation_agent: NavigationAgent3D
 var navigation_path := PackedVector3Array()
 var navigation_path_index := 0
 var navigation_goal := Vector3.INF
+var last_velocity := Vector3.ZERO
 
 var patrol_speed := 3.0
 var seek_speed := 4.8
@@ -170,6 +171,7 @@ func _steer_toward(target: Vector3, speed: float, delta: float) -> Dictionary:
 	var corrected: Vector3 = environment.clamp_to_bounds(proposed)
 	var boundary_corrected: bool = corrected.distance_to(proposed) > 0.001
 	global_position = corrected
+	last_velocity = (corrected - origin) / maxf(delta, 0.0001)
 
 	if steering.length() > 0.001:
 		look_at(global_position + steering, Vector3.UP)
@@ -293,6 +295,17 @@ func distance_to_target() -> float:
 	return flat_delta.length()
 
 
+func get_replay_payload(time_seconds: float) -> Dictionary:
+	return {
+		"time": time_seconds,
+		"agent_id": agent_id,
+		"state": get_state_name(),
+		"pos": _vector_to_array(global_position),
+		"vel": _vector_to_array(last_velocity),
+		"target": _vector_to_array(current_target),
+	}
+
+
 func _transition_to(next_state: int, reason: String) -> void:
 	var previous_state := current_state
 	current_state = next_state
@@ -333,6 +346,10 @@ func _emit_vector(channel: String, vector: Dictionary) -> void:
 
 func _vec_to_string(value: Vector3) -> String:
 	return "(%.2f, %.2f, %.2f)" % [value.x, value.y, value.z]
+
+
+func _vector_to_array(value: Vector3) -> Array[float]:
+	return [value.x, value.y, value.z]
 
 
 func _build_visuals() -> void:
