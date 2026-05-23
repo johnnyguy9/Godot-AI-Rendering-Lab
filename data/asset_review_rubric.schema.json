@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/johnnyguy9/Godot-AI-Rendering-Lab/schemas/asset_review_rubric.schema.json",
+  "title": "Godot AI Rendering Lab Asset Review Rubric",
+  "type": "object",
+  "required": ["name", "purpose", "criteria"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 3
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 12
+    },
+    "criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "weight", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "description": {
+            "type": "string",
+            "minLength": 12
+          }
+        }
+      }
+    }
+  }
+}

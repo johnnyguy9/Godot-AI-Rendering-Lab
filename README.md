@@ -121,6 +121,8 @@ If installed through Winget, restart the terminal so the `godot` alias is availa
 - `scripts/simulation_director.gd`: Multi-agent orchestration and metrics aggregation.
 - `scripts/debug_hud.gd`: Live evaluation overlay.
 - `data/asset_review_rubric.json`: Asset-quality framework.
+- `data/asset_review_rubric.schema.json`: Runtime JSON Schema contract for rubric files.
+- `data/rubric_variants/`: Alternate strict, lenient, and render-budget-focused review profiles.
 - `docs/REPLAY_FORMAT.md`: JSONL capture/playback contract.
 - `docs/TECHNICAL_REVIEW.md`: Deeper reviewer guide.
 

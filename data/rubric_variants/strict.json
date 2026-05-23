@@ -1,0 +1,31 @@
+{
+  "name": "Strict Digital Asset Review Rubric",
+  "purpose": "Raises acceptance thresholds for production-ready assets where readability, navigation clearance, and telemetry usefulness must all be strong.",
+  "criteria": [
+    {
+      "id": "silhouette_readability",
+      "weight": 0.28,
+      "description": "Assets must remain unmistakable from all review cameras and under agent FOV overlays."
+    },
+    {
+      "id": "material_language",
+      "weight": 0.24,
+      "description": "Surface response, accent color, and emissive detail must communicate object role without labels."
+    },
+    {
+      "id": "navigation_affordance",
+      "weight": 0.24,
+      "description": "Clearances must support path planning around tight layouts without confusing the viewer."
+    },
+    {
+      "id": "telemetry_value",
+      "weight": 0.16,
+      "description": "Assets must produce inspectable behavior events that help diagnose agent decisions."
+    },
+    {
+      "id": "render_budget_awareness",
+      "weight": 0.08,
+      "description": "Assets should remain lightweight, but visual clarity is weighted above budget pressure."
+    }
+  ]
+}

@@ -5,6 +5,8 @@ const FLOOR_EXTENTS := Vector2(17.0, 11.0)
 const WALKABLE_MARGIN := 1.1
 const BEACON_HEIGHT := 0.34
 const NAV_CELL_SIZE := 1.0
+const DEFAULT_RUBRIC_PATH := "res://data/asset_review_rubric.json"
+const RUBRIC_SCHEMA_PATH := "res://data/asset_review_rubric.schema.json"
 
 var bounds_min := Vector2(-FLOOR_EXTENTS.x + WALKABLE_MARGIN, -FLOOR_EXTENTS.y + WALKABLE_MARGIN)
 var bounds_max := Vector2(FLOOR_EXTENTS.x - WALKABLE_MARGIN, FLOOR_EXTENTS.y - WALKABLE_MARGIN)
@@ -17,10 +19,18 @@ var navigation_mesh: NavigationMesh
 var navigation_graph := AStar3D.new()
 var navigation_point_ids: Array[int] = []
 var navigation_point_lookup: Dictionary = {}
+var rubric_path := DEFAULT_RUBRIC_PATH
+var rubric_data: Dictionary = {}
+var startup_valid := true
 
 
 func _ready() -> void:
 	dense_preset = _has_cli_flag("--dense")
+	if not _load_and_validate_rubric():
+		startup_valid = false
+		set_process(false)
+		get_tree().quit(1)
+		return
 	_build_floor()
 	_build_grid()
 	_build_digital_assets()
@@ -91,10 +101,15 @@ func get_asset_review_snapshot() -> Dictionary:
 		"asset_count": obstacles.size(),
 		"beacon_count": beacons.size(),
 		"quality_score": asset_quality_score,
-		"rubric": _load_review_rubric(),
+		"rubric": rubric_data,
+		"rubric_path": rubric_path,
 		"nav_cells": navigation_point_ids.size(),
 		"dense_preset": dense_preset,
 	}
+
+
+func is_startup_valid() -> bool:
+	return startup_valid
 
 
 func query_beacon_in_fov(origin: Vector3, forward: Vector3, fov_degrees: float, scan_radius: float, rng: RandomNumberGenerator) -> Dictionary:
@@ -251,6 +266,23 @@ func _has_cli_flag(flag: String) -> bool:
 	return OS.get_cmdline_args().has(flag) or OS.get_cmdline_user_args().has(flag)
 
 
+func _get_cli_value(flag: String, default_value: String = "") -> String:
+	var args := OS.get_cmdline_args() + OS.get_cmdline_user_args()
+	for index in range(args.size()):
+		var arg := str(args[index])
+		if arg == flag and index + 1 < args.size():
+			return str(args[index + 1])
+		if arg.begins_with("%s=" % flag):
+			return arg.substr(flag.length() + 1)
+	return default_value
+
+
+func _resolve_data_path(path: String) -> String:
+	if path.begins_with("res://") or path.begins_with("user://") or path.is_absolute_path():
+		return path
+	return "res://%s" % path
+
+
 func _process(delta: float) -> void:
 	for index in range(beacons.size()):
 		if beacons[index]["cooldown"] > 0.0:
@@ -384,15 +416,113 @@ func _calculate_asset_quality_score() -> float:
 	return total / maxf(float(obstacles.size()), 1.0)
 
 
-func _load_review_rubric() -> Dictionary:
-	var path := "res://data/asset_review_rubric.json"
+func _load_and_validate_rubric() -> bool:
+	rubric_path = _resolve_data_path(_get_cli_value("--rubric", DEFAULT_RUBRIC_PATH))
+	var schema := _read_json_dictionary(RUBRIC_SCHEMA_PATH)
+	rubric_data = _read_json_dictionary(rubric_path)
+	var errors := validate_rubric_data(rubric_data, schema)
+	if not errors.is_empty():
+		push_error("Asset rubric validation failed for %s:\n- %s" % [rubric_path, "\n- ".join(errors)])
+		return false
+	print("[RUBRIC] Loaded %s from %s" % [rubric_data.get("name", "Unnamed rubric"), rubric_path])
+	return true
+
+
+func validate_rubric_data(data: Dictionary, schema: Dictionary) -> Array[String]:
+	var errors: Array[String] = []
+	if schema.is_empty():
+		errors.append("schema file is missing or invalid")
+	if data.is_empty():
+		errors.append("rubric file is missing, empty, or invalid JSON")
+	if errors.is_empty():
+		_validate_json_schema(data, schema, "$", errors)
+		_validate_rubric_weight_total(data, errors)
+	return errors
+
+
+func _validate_json_schema(value, schema: Dictionary, path: String, errors: Array[String]) -> void:
+	var expected_type := str(schema.get("type", ""))
+	if not _json_type_matches(value, expected_type):
+		errors.append("%s expected %s, got %s" % [path, expected_type, _json_type_name(value)])
+		return
+
+	if expected_type == "object":
+		for key in schema.get("required", []):
+			if not value.has(key):
+				errors.append("%s missing required key '%s'" % [path, key])
+		var properties: Dictionary = schema.get("properties", {})
+		for key in properties.keys():
+			if value.has(key):
+				_validate_json_schema(value[key], properties[key], "%s.%s" % [path, key], errors)
+		if bool(schema.get("additionalProperties", true)) == false:
+			for key in value.keys():
+				if not properties.has(key):
+					errors.append("%s contains unexpected key '%s'" % [path, key])
+
+	if expected_type == "array":
+		if schema.has("minItems") and value.size() < int(schema["minItems"]):
+			errors.append("%s expected at least %d item(s)" % [path, int(schema["minItems"])])
+		var item_schema: Dictionary = schema.get("items", {})
+		for index in range(value.size()):
+			_validate_json_schema(value[index], item_schema, "%s[%d]" % [path, index], errors)
+
+	if expected_type == "number":
+		if schema.has("minimum") and float(value) < float(schema["minimum"]):
+			errors.append("%s is below minimum %.3f" % [path, float(schema["minimum"])])
+		if schema.has("maximum") and float(value) > float(schema["maximum"]):
+			errors.append("%s is above maximum %.3f" % [path, float(schema["maximum"])])
+
+	if expected_type == "string":
+		if schema.has("minLength") and str(value).length() < int(schema["minLength"]):
+			errors.append("%s is shorter than %d characters" % [path, int(schema["minLength"])])
+		if schema.has("pattern"):
+			var regex := RegEx.new()
+			regex.compile(str(schema["pattern"]))
+			if regex.search(str(value)) == null:
+				errors.append("%s does not match pattern %s" % [path, schema["pattern"]])
+
+
+func _validate_rubric_weight_total(data: Dictionary, errors: Array[String]) -> void:
+	var total := 0.0
+	for criterion in data.get("criteria", []):
+		total += float(criterion.get("weight", 0.0))
+	if absf(total - 1.0) > 0.001:
+		errors.append("criteria weights must sum to 1.0; got %.4f" % total)
+
+
+func _json_type_matches(value, expected_type: String) -> bool:
+	match expected_type:
+		"object":
+			return typeof(value) == TYPE_DICTIONARY
+		"array":
+			return typeof(value) == TYPE_ARRAY
+		"string":
+			return typeof(value) == TYPE_STRING
+		"number":
+			return typeof(value) == TYPE_FLOAT or typeof(value) == TYPE_INT
+		_:
+			return false
+
+
+func _json_type_name(value) -> String:
+	match typeof(value):
+		TYPE_DICTIONARY:
+			return "object"
+		TYPE_ARRAY:
+			return "array"
+		TYPE_STRING:
+			return "string"
+		TYPE_FLOAT, TYPE_INT:
+			return "number"
+		_:
+			return str(typeof(value))
+
+
+func _read_json_dictionary(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {}
-	var file_text := FileAccess.get_file_as_string(path)
-	var parsed = JSON.parse_string(file_text)
-	if typeof(parsed) == TYPE_DICTIONARY:
-		return parsed
-	return {}
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
+	return parsed if typeof(parsed) == TYPE_DICTIONARY else {}
 
 
 func _material(color: Color, roughness: float, metallic: float, emission: Color = Color.BLACK) -> StandardMaterial3D:

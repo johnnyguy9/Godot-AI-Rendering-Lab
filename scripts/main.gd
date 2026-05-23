@@ -74,6 +74,8 @@ func _build_simulation() -> void:
 	environment = SimulationEnvironment.new()
 	environment.name = "DigitalTwinEnvironment"
 	add_child(environment)
+	if environment.has_method("is_startup_valid") and not environment.is_startup_valid():
+		return
 
 	director = SimulationDirector.new()
 	director.name = "SimulationDirector"
