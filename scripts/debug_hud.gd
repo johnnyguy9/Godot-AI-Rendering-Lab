@@ -101,10 +101,13 @@ func _on_metrics_changed(snapshot: Dictionary) -> void:
 	var rubric: Dictionary = review.get("rubric", {})
 	var rubric_name := str(rubric.get("name", "Asset Quality Rubric"))
 	var score: float = float(review.get("quality_score", 0.0)) * 100.0
-	asset_label.text = "%s | assets %d | beacons %d | quality %.1f%%" % [
+	var dense_label := "dense" if bool(review.get("dense_preset", false)) else "standard"
+	asset_label.text = "%s | assets %d | beacons %d | nav %d | %s | quality %.1f%%" % [
 		rubric_name,
 		review.get("asset_count", 0),
 		review.get("beacon_count", 0),
+		review.get("nav_cells", 0),
+		dense_label,
 		score,
 	]
 

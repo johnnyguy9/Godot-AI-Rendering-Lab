@@ -4,23 +4,47 @@ class_name SimulationEnvironment
 const FLOOR_EXTENTS := Vector2(17.0, 11.0)
 const WALKABLE_MARGIN := 1.1
 const BEACON_HEIGHT := 0.34
+const NAV_CELL_SIZE := 1.0
 
 var bounds_min := Vector2(-FLOOR_EXTENTS.x + WALKABLE_MARGIN, -FLOOR_EXTENTS.y + WALKABLE_MARGIN)
 var bounds_max := Vector2(FLOOR_EXTENTS.x - WALKABLE_MARGIN, FLOOR_EXTENTS.y - WALKABLE_MARGIN)
 var obstacles: Array[Dictionary] = []
 var beacons: Array[Dictionary] = []
 var asset_quality_score := 0.0
+var dense_preset := false
+var navigation_region: NavigationRegion3D
+var navigation_mesh: NavigationMesh
+var navigation_graph := AStar3D.new()
+var navigation_point_ids: Array[int] = []
+var navigation_point_lookup: Dictionary = {}
 
 
 func _ready() -> void:
+	dense_preset = _has_cli_flag("--dense")
 	_build_floor()
 	_build_grid()
 	_build_digital_assets()
 	_build_sensor_beacons()
+	_bake_navigation_region()
 	asset_quality_score = _calculate_asset_quality_score()
+	if dense_preset:
+		print("[NAV] Dense preset enabled: navmesh contains %d walkable cells around %d assets." % [navigation_point_ids.size(), obstacles.size()])
 
 
 func sample_navigable_point(rng: RandomNumberGenerator, clearance: float = 0.75) -> Vector3:
+	if not navigation_point_ids.is_empty():
+		for graph_attempt in range(64):
+			var point_id: int = navigation_point_ids[rng.randi_range(0, navigation_point_ids.size() - 1)]
+			var graph_point := navigation_graph.get_point_position(point_id)
+			var jitter := Vector3(
+				rng.randf_range(-NAV_CELL_SIZE * 0.32, NAV_CELL_SIZE * 0.32),
+				0.0,
+				rng.randf_range(-NAV_CELL_SIZE * 0.32, NAV_CELL_SIZE * 0.32)
+			)
+			var candidate := Vector3(graph_point.x + jitter.x, BEACON_HEIGHT, graph_point.z + jitter.z)
+			if is_navigable(candidate, clearance):
+				return candidate
+
 	for attempt in range(128):
 		var candidate := Vector3(
 			rng.randf_range(bounds_min.x, bounds_max.x),
@@ -68,6 +92,8 @@ func get_asset_review_snapshot() -> Dictionary:
 		"beacon_count": beacons.size(),
 		"quality_score": asset_quality_score,
 		"rubric": _load_review_rubric(),
+		"nav_cells": navigation_point_ids.size(),
+		"dense_preset": dense_preset,
 	}
 
 
@@ -106,6 +132,123 @@ func query_beacon_in_fov(origin: Vector3, forward: Vector3, fov_degrees: float, 
 func calculate_beacon_score(priority: float, distance: float, scan_radius: float, rng: RandomNumberGenerator) -> float:
 	var distance_weight := 1.0 - clampf(distance / scan_radius, 0.0, 1.0)
 	return priority + distance_weight + rng.randf_range(0.0, 0.12)
+
+
+func get_navigation_path(start: Vector3, target: Vector3) -> PackedVector3Array:
+	if navigation_point_ids.is_empty():
+		return PackedVector3Array([clamp_to_bounds(target)])
+
+	var start_id := _nearest_navigation_point_id(start)
+	var target_id := _nearest_navigation_point_id(target)
+	if start_id == -1 or target_id == -1:
+		return PackedVector3Array([clamp_to_bounds(target)])
+
+	var point_ids := navigation_graph.get_id_path(start_id, target_id)
+	var path := PackedVector3Array()
+	for point_id in point_ids:
+		var point := navigation_graph.get_point_position(point_id)
+		path.append(Vector3(point.x, BEACON_HEIGHT, point.z))
+
+	var final_target := clamp_to_bounds(target)
+	if path.is_empty() or path[path.size() - 1].distance_to(final_target) > 0.2:
+		path.append(final_target)
+	return path
+
+
+func get_navigation_point_count() -> int:
+	return navigation_point_ids.size()
+
+
+func _bake_navigation_region() -> void:
+	navigation_graph.clear()
+	navigation_point_ids.clear()
+	navigation_point_lookup.clear()
+
+	navigation_region = NavigationRegion3D.new()
+	navigation_region.name = "ProceduralNavigationRegion"
+	add_child(navigation_region)
+
+	navigation_mesh = NavigationMesh.new()
+	var vertices := PackedVector3Array()
+	var vertex_lookup: Dictionary = {}
+	var polygons: Array[PackedInt32Array] = []
+
+	var x_cells := int(floor((bounds_max.x - bounds_min.x) / NAV_CELL_SIZE))
+	var z_cells := int(floor((bounds_max.y - bounds_min.y) / NAV_CELL_SIZE))
+	for x_index in range(x_cells):
+		for z_index in range(z_cells):
+			var center_2d := Vector2(
+				bounds_min.x + (float(x_index) + 0.5) * NAV_CELL_SIZE,
+				bounds_min.y + (float(z_index) + 0.5) * NAV_CELL_SIZE
+			)
+			var center := Vector3(center_2d.x, BEACON_HEIGHT, center_2d.y)
+			if not is_navigable(center, 0.55):
+				continue
+
+			var polygon := PackedInt32Array([
+				_nav_vertex_index(vertices, vertex_lookup, x_index, z_index),
+				_nav_vertex_index(vertices, vertex_lookup, x_index + 1, z_index),
+				_nav_vertex_index(vertices, vertex_lookup, x_index + 1, z_index + 1),
+				_nav_vertex_index(vertices, vertex_lookup, x_index, z_index + 1),
+			])
+			polygons.append(polygon)
+
+			var point_id := x_index * 1000 + z_index
+			navigation_graph.add_point(point_id, center)
+			navigation_point_ids.append(point_id)
+			navigation_point_lookup[_nav_key(x_index, z_index)] = point_id
+
+	navigation_mesh.set_vertices(vertices)
+	for polygon in polygons:
+		navigation_mesh.add_polygon(polygon)
+	navigation_region.navigation_mesh = navigation_mesh
+
+	for key in navigation_point_lookup.keys():
+		var parts := String(key).split(":")
+		var x_index := int(parts[0])
+		var z_index := int(parts[1])
+		var point_id: int = navigation_point_lookup[key]
+		for offset in [Vector2i(1, 0), Vector2i(0, 1)]:
+			var neighbor_key := _nav_key(x_index + offset.x, z_index + offset.y)
+			if navigation_point_lookup.has(neighbor_key):
+				navigation_graph.connect_points(point_id, int(navigation_point_lookup[neighbor_key]), true)
+
+
+func _nav_vertex_index(vertices: PackedVector3Array, vertex_lookup: Dictionary, x_index: int, z_index: int) -> int:
+	var key := _nav_key(x_index, z_index)
+	if vertex_lookup.has(key):
+		return int(vertex_lookup[key])
+
+	var vertex := Vector3(
+		bounds_min.x + float(x_index) * NAV_CELL_SIZE,
+		0.02,
+		bounds_min.y + float(z_index) * NAV_CELL_SIZE
+	)
+	var index := vertices.size()
+	vertices.append(vertex)
+	vertex_lookup[key] = index
+	return index
+
+
+func _nearest_navigation_point_id(point: Vector3) -> int:
+	var best_id := -1
+	var best_distance := INF
+	var flat_point := Vector3(point.x, BEACON_HEIGHT, point.z)
+	for point_id in navigation_point_ids:
+		var candidate := navigation_graph.get_point_position(point_id)
+		var distance := flat_point.distance_squared_to(candidate)
+		if distance < best_distance:
+			best_distance = distance
+			best_id = point_id
+	return best_id
+
+
+func _nav_key(x_index: int, z_index: int) -> String:
+	return "%d:%d" % [x_index, z_index]
+
+
+func _has_cli_flag(flag: String) -> bool:
+	return OS.get_cmdline_args().has(flag) or OS.get_cmdline_user_args().has(flag)
 
 
 func _process(delta: float) -> void:
@@ -160,6 +303,11 @@ func _build_digital_assets() -> void:
 	_add_asset("render_node", "Render Node", Vector3(4.8, 0.95, -6.2), Vector3(1.45, 1.9, 1.45), Color(0.88, 0.30, 0.38), 1.55, 0.94)
 	_add_asset("sensor_tower", "Sensor Tower", Vector3(0.0, 1.12, 6.9), Vector3(1.0, 2.25, 1.0), Color(0.62, 0.50, 0.96), 1.4, 0.90)
 	_add_asset("lighting_probe", "Lighting Probe", Vector3(11.0, 0.55, -1.4), Vector3(1.15, 1.1, 1.15), Color(0.98, 0.80, 0.36), 1.25, 0.84)
+	if dense_preset:
+		_add_asset("dense_left_gate", "Dense Left Gate", Vector3(-1.9, 0.72, 1.2), Vector3(1.2, 1.45, 4.6), Color(0.30, 0.62, 0.88), 1.35, 0.86)
+		_add_asset("dense_right_gate", "Dense Right Gate", Vector3(1.9, 0.72, 1.2), Vector3(1.2, 1.45, 4.6), Color(0.30, 0.62, 0.88), 1.35, 0.86)
+		_add_asset("dense_offset_rack", "Dense Offset Rack", Vector3(-6.7, 0.82, 0.9), Vector3(1.6, 1.64, 3.8), Color(0.70, 0.55, 0.88), 1.45, 0.84)
+		_add_asset("dense_budget_wall", "Dense Budget Wall", Vector3(6.5, 0.78, -1.6), Vector3(1.4, 1.56, 3.6), Color(0.92, 0.48, 0.34), 1.38, 0.83)
 
 
 func _add_asset(id: String, label: String, position: Vector3, size: Vector3, color: Color, radius: float, review_score: float) -> void:

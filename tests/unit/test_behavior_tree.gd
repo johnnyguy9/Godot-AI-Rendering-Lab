@@ -8,6 +8,8 @@ func _environment_with_front_beacon() -> SimulationEnvironment:
 	var environment := SimulationEnvironment.new()
 	add_child_autofree(environment)
 	environment.obstacles = []
+	environment.navigation_graph.clear()
+	environment.navigation_point_ids.clear()
 	environment.beacons = [{
 		"id": "front_target",
 		"name": "Front Target",

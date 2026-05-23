@@ -28,6 +28,10 @@ var current_target := Vector3.ZERO
 var active_beacon: Dictionary = {}
 var controller_mode := ControllerMode.FSM
 var behavior_tree := AgentBT.new()
+var navigation_agent: NavigationAgent3D
+var navigation_path := PackedVector3Array()
+var navigation_path_index := 0
+var navigation_goal := Vector3.INF
 
 var patrol_speed := 3.0
 var seek_speed := 4.8
@@ -49,6 +53,7 @@ func configure(p_environment, p_agent_id: String, p_palette: Color, seed_value: 
 	palette = p_palette
 	rng.seed = seed_value
 	_build_visuals()
+	_configure_navigation_agent()
 	global_position = environment.sample_navigable_point(rng, obstacle_clearance)
 	current_target = environment.sample_navigable_point(rng, obstacle_clearance)
 	idle_duration = _next_idle_duration()
@@ -147,7 +152,8 @@ func _update_idle() -> void:
 
 func _steer_toward(target: Vector3, speed: float, delta: float) -> Dictionary:
 	var origin := global_position
-	var target_delta := target - origin
+	var path_target := _navigation_follow_target(target)
+	var target_delta := path_target - origin
 	target_delta.y = 0.0
 	var distance := target_delta.length()
 	var desired := Vector3.ZERO
@@ -171,6 +177,7 @@ func _steer_toward(target: Vector3, speed: float, delta: float) -> Dictionary:
 	return {
 		"origin": origin,
 		"target": target,
+		"path_target": path_target,
 		"desired": desired,
 		"avoidance": avoidance,
 		"separation": separation,
@@ -182,6 +189,29 @@ func _steer_toward(target: Vector3, speed: float, delta: float) -> Dictionary:
 		"corrected": corrected,
 		"boundary_corrected": boundary_corrected,
 	}
+
+
+func _navigation_follow_target(target: Vector3) -> Vector3:
+	var goal_changed := navigation_goal == Vector3.INF or navigation_goal.distance_to(target) > 0.35
+	if goal_changed or navigation_path.is_empty():
+		navigation_goal = target
+		navigation_path = environment.get_navigation_path(global_position, target)
+		navigation_path_index = 0
+		if navigation_agent:
+			navigation_agent.target_position = target
+
+	while navigation_path_index < navigation_path.size() - 1 and global_position.distance_to(navigation_path[navigation_path_index]) < 0.58:
+		navigation_path_index += 1
+
+	var graph_target := target
+	if not navigation_path.is_empty():
+		graph_target = navigation_path[navigation_path_index]
+
+	if navigation_agent and is_inside_tree():
+		var engine_target := navigation_agent.get_next_path_position()
+		if environment.contains_point(engine_target) and environment.is_navigable(engine_target, 0.2):
+			return graph_target.lerp(engine_target, 0.18)
+	return graph_target
 
 
 func _obstacle_avoidance() -> Vector3:
@@ -347,6 +377,19 @@ func _build_visuals() -> void:
 	add_child(state_ring)
 
 	_update_agent_material()
+
+
+func _configure_navigation_agent() -> void:
+	if navigation_agent != null:
+		return
+
+	navigation_agent = NavigationAgent3D.new()
+	navigation_agent.name = "PathPlanner"
+	navigation_agent.path_desired_distance = 0.55
+	navigation_agent.target_desired_distance = arrival_radius
+	navigation_agent.path_max_distance = 2.6
+	navigation_agent.radius = 0.38
+	add_child(navigation_agent)
 
 
 func _build_fov_mesh() -> ImmediateMesh:
