@@ -1,0 +1,73 @@
+name: Export Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  GODOT_VERSION: "4.6.3"
+  GODOT_RELEASE: "stable"
+  GODOT_TEMPLATES_VERSION: "4.6.3.stable"
+  GODOT_BINARY: ".godot-bin/Godot_v4.6.3-stable_linux.x86_64"
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    name: Build desktop exports
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot binary and templates
+        uses: actions/cache@v4
+        with:
+          path: |
+            .godot-bin
+            ~/.local/share/godot/export_templates
+          key: godot-export-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}
+
+      - name: Install Godot and export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -x "${GODOT_BINARY}" ]]; then
+            mkdir -p .godot-bin
+            curl -L "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_RELEASE}/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64.zip" -o /tmp/godot.zip
+            unzip -q /tmp/godot.zip -d .godot-bin
+            chmod +x "${GODOT_BINARY}"
+          fi
+
+          GODOT_TEMPLATES_DIR="$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATES_VERSION}"
+          if [[ ! -d "${GODOT_TEMPLATES_DIR}" ]]; then
+            mkdir -p "${GODOT_TEMPLATES_DIR}"
+            curl -L "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_RELEASE}/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_export_templates.tpz" -o /tmp/templates.tpz
+            rm -rf /tmp/godot_templates
+            mkdir -p /tmp/godot_templates
+            unzip -q /tmp/templates.tpz -d /tmp/godot_templates
+            cp -R /tmp/godot_templates/templates/* "${GODOT_TEMPLATES_DIR}/"
+          fi
+
+      - name: Import project
+        run: "${GODOT_BINARY} --headless --path . --import"
+
+      - name: Export builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/linux build/windows build/macos dist
+          "${GODOT_BINARY}" --headless --path . --export-release "Linux" build/linux/Godot-AI-Rendering-Lab.x86_64
+          "${GODOT_BINARY}" --headless --path . --export-release "Windows Desktop" build/windows/Godot-AI-Rendering-Lab.exe
+          "${GODOT_BINARY}" --headless --path . --export-release "macOS" build/macos/Godot-AI-Rendering-Lab.zip
+          (cd build/linux && zip -qr ../../dist/Godot-AI-Rendering-Lab-linux.zip .)
+          (cd build/windows && zip -qr ../../dist/Godot-AI-Rendering-Lab-windows.zip .)
+          cp build/macos/Godot-AI-Rendering-Lab.zip dist/Godot-AI-Rendering-Lab-macos.zip
+
+      - name: Attach release artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
