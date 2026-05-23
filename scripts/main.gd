@@ -24,6 +24,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("cycle_camera"):
 		camera_mode = (camera_mode + 1) % 3
 		_apply_camera_mode()
+	if event.is_action_pressed("toggle_controller") and director:
+		director.toggle_controller()
 
 
 func _configure_rendering() -> void:

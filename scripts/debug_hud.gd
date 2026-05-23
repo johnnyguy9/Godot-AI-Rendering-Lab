@@ -32,7 +32,7 @@ func _build_hud() -> void:
 	panel.name = "TelemetryPanel"
 	panel.offset_left = 18.0
 	panel.offset_top = 18.0
-	panel.custom_minimum_size = Vector2(430.0, 310.0)
+	panel.custom_minimum_size = Vector2(500.0, 310.0)
 	root.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -64,13 +64,13 @@ func _build_hud() -> void:
 	stack.add_child(asset_label)
 
 	event_log = RichTextLabel.new()
-	event_log.custom_minimum_size = Vector2(390.0, 118.0)
+	event_log.custom_minimum_size = Vector2(460.0, 118.0)
 	event_log.scroll_active = false
 	event_log.bbcode_enabled = true
 	stack.add_child(event_log)
 
 	var footer := Label.new()
-	footer.text = "F3 HUD  |  C Camera  |  R Reset"
+	footer.text = "F3 HUD  |  C Camera  |  R Reset  |  B Controller"
 	footer.add_theme_color_override("font_color", Color(0.70, 0.80, 0.84))
 	stack.add_child(footer)
 
@@ -79,7 +79,8 @@ func _on_metrics_changed(snapshot: Dictionary) -> void:
 	if metrics_label == null:
 		return
 
-	metrics_label.text = "Runtime %.1fs | Agents %d | Transitions %d | FOV Locks %d | Vector Samples %d" % [
+	metrics_label.text = "Controller %s | Runtime %.1fs | Agents %d | Transitions %d | FOV Locks %d | Vector Samples %d" % [
+		snapshot.get("controller", "FSM"),
 		snapshot["runtime"],
 		snapshot["agents"],
 		snapshot["transitions"],

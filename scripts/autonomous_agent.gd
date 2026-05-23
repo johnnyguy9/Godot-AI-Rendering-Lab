@@ -5,9 +5,13 @@ signal transitioned(agent_id: String, from_state: String, to_state: String, reas
 signal vector_evaluated(agent_id: String, payload: Dictionary)
 signal perception_locked(agent_id: String, beacon_name: String)
 
+const AgentBT := preload("res://scripts/behavior_tree/agent_bt.gd")
+
 enum AgentState { PATROL, SEEK, IDLE }
+enum ControllerMode { FSM, BEHAVIOR_TREE }
 
 const STATE_NAMES := ["Patrol", "Seek", "Idle"]
+const CONTROLLER_NAMES := ["FSM", "BT"]
 
 var environment
 var peers: Array = []
@@ -22,6 +26,8 @@ var scan_elapsed := 0.0
 var vector_log_elapsed := 0.0
 var current_target := Vector3.ZERO
 var active_beacon: Dictionary = {}
+var controller_mode := ControllerMode.FSM
+var behavior_tree := AgentBT.new()
 
 var patrol_speed := 3.0
 var seek_speed := 4.8
@@ -62,6 +68,15 @@ func _physics_process(delta: float) -> void:
 	scan_elapsed += delta
 	vector_log_elapsed += delta
 
+	if controller_mode == ControllerMode.BEHAVIOR_TREE:
+		behavior_tree.tick(self, delta)
+	else:
+		_tick_fsm(delta)
+
+	_update_state_ring()
+
+
+func _tick_fsm(delta: float) -> void:
 	match current_state:
 		AgentState.PATROL:
 			_update_patrol(delta)
@@ -70,7 +85,13 @@ func _physics_process(delta: float) -> void:
 		AgentState.IDLE:
 			_update_idle()
 
-	_update_state_ring()
+
+func set_controller_mode(mode: int) -> void:
+	controller_mode = mode
+
+
+func get_controller_name() -> String:
+	return CONTROLLER_NAMES[controller_mode]
 
 
 func _update_patrol(delta: float) -> void:
