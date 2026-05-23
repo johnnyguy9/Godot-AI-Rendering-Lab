@@ -9,6 +9,8 @@ func _make_environment() -> SimulationEnvironment:
 	add_child_autofree(environment)
 	environment.obstacles = []
 	environment.beacons = []
+	environment.navigation_graph.clear()
+	environment.navigation_point_ids.clear()
 	environment.bounds_min = Vector2(-12.0, -12.0)
 	environment.bounds_max = Vector2(12.0, 12.0)
 	return environment
