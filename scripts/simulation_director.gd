@@ -15,6 +15,7 @@ var runtime_seconds := 0.0
 var metrics_elapsed := 0.0
 var latest_vector_summary := "Awaiting first vector sample"
 var asset_review := {}
+var controller_mode := AutonomousAgent.ControllerMode.FSM
 
 
 func configure(p_environment) -> void:
@@ -43,7 +44,29 @@ func get_metrics_snapshot() -> Dictionary:
 		"vector_samples": vector_samples,
 		"latest_vector": latest_vector_summary,
 		"asset_review": asset_review,
+		"controller": get_controller_name(),
 	}
+
+
+func toggle_controller() -> void:
+	if controller_mode == AutonomousAgent.ControllerMode.FSM:
+		set_controller_mode(AutonomousAgent.ControllerMode.BEHAVIOR_TREE)
+	else:
+		set_controller_mode(AutonomousAgent.ControllerMode.FSM)
+
+
+func set_controller_mode(mode: int) -> void:
+	controller_mode = mode
+	for agent in agents:
+		agent.set_controller_mode(mode)
+	_log("Controller switched to %s" % get_controller_name())
+	metrics_changed.emit(get_metrics_snapshot())
+
+
+func get_controller_name() -> String:
+	if agents.is_empty():
+		return AutonomousAgent.CONTROLLER_NAMES[controller_mode]
+	return agents[0].get_controller_name()
 
 
 func _state_counts() -> Dictionary:
@@ -79,6 +102,7 @@ func _spawn_agents() -> void:
 		agent.name = "AutonomousAgent_%02d" % (index + 1)
 		add_child(agent)
 		agent.configure(environment, "Unit-%02d" % (index + 1), palettes[index], 9301 + index * 997)
+		agent.set_controller_mode(controller_mode)
 		agent.transitioned.connect(_on_agent_transitioned)
 		agent.perception_locked.connect(_on_agent_perception_locked)
 		agent.vector_evaluated.connect(_on_agent_vector_evaluated)
