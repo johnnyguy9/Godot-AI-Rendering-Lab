@@ -1,0 +1,31 @@
+{
+  "name": "Lenient Digital Asset Review Rubric",
+  "purpose": "Supports early blockout reviews where fast iteration and readable gameplay affordances matter more than final material polish.",
+  "criteria": [
+    {
+      "id": "silhouette_readability",
+      "weight": 0.22,
+      "description": "Assets should read clearly from the primary review camera, even if secondary angles are rough."
+    },
+    {
+      "id": "material_language",
+      "weight": 0.14,
+      "description": "Basic color and roughness choices should communicate intent without requiring final shading."
+    },
+    {
+      "id": "navigation_affordance",
+      "weight": 0.26,
+      "description": "Agents should be able to route around blockout geometry without obvious clipping."
+    },
+    {
+      "id": "telemetry_value",
+      "weight": 0.22,
+      "description": "The asset should trigger useful behavior or inspection events during prototype reviews."
+    },
+    {
+      "id": "render_budget_awareness",
+      "weight": 0.16,
+      "description": "Prototype assets should stay simple enough for rapid capture and replay workflows."
+    }
+  ]
+}

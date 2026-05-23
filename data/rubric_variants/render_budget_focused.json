@@ -1,0 +1,31 @@
+{
+  "name": "Render Budget Focused Asset Review Rubric",
+  "purpose": "Prioritizes assets that preserve frame budget, capture stability, and review clarity under heavier simulation loads.",
+  "criteria": [
+    {
+      "id": "silhouette_readability",
+      "weight": 0.18,
+      "description": "Assets should remain recognizable even when simplified for performance."
+    },
+    {
+      "id": "material_language",
+      "weight": 0.16,
+      "description": "Materials should use efficient color, roughness, and emission cues instead of expensive detail."
+    },
+    {
+      "id": "navigation_affordance",
+      "weight": 0.18,
+      "description": "Collision and navigation boundaries should remain stable under dense routing scenarios."
+    },
+    {
+      "id": "telemetry_value",
+      "weight": 0.16,
+      "description": "Assets should still emit meaningful review signals without requiring heavy debug rendering."
+    },
+    {
+      "id": "render_budget_awareness",
+      "weight": 0.32,
+      "description": "The asset should demonstrate strong visual return for low mesh, material, and capture cost."
+    }
+  ]
+}
