@@ -2,6 +2,15 @@
 
 A Godot 4 portfolio demo for real-time AI behavior, procedural digital assets, field-of-view perception, steering, live evaluation telemetry, and rendering-review workflows.
 
+![Godot 4.6](https://img.shields.io/badge/Godot-4.6-478CBF?logo=godot-engine&logoColor=white)
+![License MIT](https://img.shields.io/badge/license-MIT-green)
+![CI](https://github.com/johnnyguy9/Godot-AI-Rendering-Lab/actions/workflows/ci.yml/badge.svg)
+![Last commit](https://img.shields.io/github/last-commit/johnnyguy9/Godot-AI-Rendering-Lab)
+
+![Godot AI Rendering Lab hero screenshot](media/hero.png)
+
+![Autonomous agents transitioning from patrol to seek](media/patrol-seek.gif)
+
 ## Executive Summary
 
 This project is built to be evaluated quickly by a technical reviewer. It is not a static scene or a toy script. It is a running Godot simulation where autonomous agents patrol a digital twin, perceive targets through visible FOV cones, respond to inspection beacons, avoid procedural assets, and report their reasoning through a live HUD.
@@ -121,6 +130,16 @@ godot --headless --path . --quit
 ```
 
 Expected signal: the console should report three agents transitioning from `Idle` to `Patrol`, followed by the director startup message.
+
+## Media Capture
+
+The committed screenshot and GIF are generated from the running Godot scene through Movie Maker frames and FFmpeg palette conversion:
+
+```bash
+make capture-media GODOT=godot FFMPEG=ffmpeg
+```
+
+The target records 240 frames at 30 FPS, copies frame 60 to `media/hero.png`, and converts the full 8-second Patrol/Seek run to `media/patrol-seek.gif`.
 
 ## Roadmap
 
