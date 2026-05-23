@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "codex/**"
+
+env:
+  GODOT_VERSION: "4.6.3"
+  GODOT_RELEASE: "stable"
+  GODOT_BINARY: ".godot-bin/Godot_v4.6.3-stable_linux.x86_64"
+
+jobs:
+  godot:
+    name: Godot headless boot and GUT
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot binary
+        uses: actions/cache@v4
+        with:
+          path: .godot-bin
+          key: godot-${{ runner.os }}-${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}
+
+      - name: Install Godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -x "${GODOT_BINARY}" ]]; then
+            mkdir -p .godot-bin
+            curl -L "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_RELEASE}/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64.zip" -o /tmp/godot.zip
+            unzip -q /tmp/godot.zip -d .godot-bin
+            chmod +x "${GODOT_BINARY}"
+          fi
+          "${GODOT_BINARY}" --version
+
+      - name: Import project
+        run: "${GODOT_BINARY} --headless --path . --import"
+
+      - name: Headless boot
+        run: "${GODOT_BINARY} --headless --path . --quit"
+
+      - name: Run GUT
+        run: GODOT_BIN="${GODOT_BINARY}" tests/run_tests.sh
