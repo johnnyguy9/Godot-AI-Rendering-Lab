@@ -30,6 +30,8 @@ Core signals:
 - `F3`: Toggle evaluation HUD.
 - `C`: Cycle review camera angles.
 - `R`: Reset the simulation.
+- `B`: Toggle FSM / behavior-tree controller.
+- `P`: Toggle replay ghost playback when a JSONL replay is loaded.
 
 ## System Architecture
 
@@ -119,6 +121,7 @@ If installed through Winget, restart the terminal so the `godot` alias is availa
 - `scripts/simulation_director.gd`: Multi-agent orchestration and metrics aggregation.
 - `scripts/debug_hud.gd`: Live evaluation overlay.
 - `data/asset_review_rubric.json`: Asset-quality framework.
+- `docs/REPLAY_FORMAT.md`: JSONL capture/playback contract.
 - `docs/TECHNICAL_REVIEW.md`: Deeper reviewer guide.
 
 ## Validation

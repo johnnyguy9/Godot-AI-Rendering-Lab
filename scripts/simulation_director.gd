@@ -16,6 +16,7 @@ var metrics_elapsed := 0.0
 var latest_vector_summary := "Awaiting first vector sample"
 var asset_review := {}
 var controller_mode := AutonomousAgent.ControllerMode.FSM
+var replay_recorder
 
 
 func configure(p_environment) -> void:
@@ -31,6 +32,8 @@ func _process(delta: float) -> void:
 	if metrics_elapsed >= 0.5:
 		metrics_elapsed = 0.0
 		metrics_changed.emit(get_metrics_snapshot())
+	if replay_recorder:
+		replay_recorder.record_tick(runtime_seconds, agents)
 
 
 func get_metrics_snapshot() -> Dictionary:
@@ -67,6 +70,10 @@ func get_controller_name() -> String:
 	if agents.is_empty():
 		return AutonomousAgent.CONTROLLER_NAMES[controller_mode]
 	return agents[0].get_controller_name()
+
+
+func bind_replay_recorder(recorder) -> void:
+	replay_recorder = recorder
 
 
 func _state_counts() -> Dictionary:
