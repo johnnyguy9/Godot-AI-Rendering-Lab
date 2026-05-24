@@ -7,6 +7,7 @@ var latest_vector_label: Label
 var asset_label: Label
 var event_log: RichTextLabel
 var event_lines: Array[String] = []
+var pause_banner: Label
 
 
 func _ready() -> void:
@@ -20,6 +21,11 @@ func bind(p_director) -> void:
 	director.event_logged.connect(_on_event_logged)
 	director.metrics_changed.connect(_on_metrics_changed)
 	_on_metrics_changed(director.get_metrics_snapshot())
+
+
+func set_paused(is_paused: bool) -> void:
+	if pause_banner:
+		pause_banner.visible = is_paused
 
 
 func _build_hud() -> void:
@@ -70,9 +76,20 @@ func _build_hud() -> void:
 	stack.add_child(event_log)
 
 	var footer := Label.new()
-	footer.text = "F3 HUD  |  C Camera  |  R Reset"
+	footer.text = "F3 HUD  |  C Camera  |  R Reset  |  Space Pause"
 	footer.add_theme_color_override("font_color", Color(0.70, 0.80, 0.84))
 	stack.add_child(footer)
+
+	# Floating PAUSED banner — hidden by default, shown via set_paused().
+	pause_banner = Label.new()
+	pause_banner.name = "PauseBanner"
+	pause_banner.text = "  PAUSED  "
+	pause_banner.add_theme_font_size_override("font_size", 22)
+	pause_banner.add_theme_color_override("font_color", Color(1.0, 0.92, 0.36))
+	pause_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	pause_banner.offset_top = 28.0
+	pause_banner.visible = false
+	root.add_child(pause_banner)
 
 
 func _on_metrics_changed(snapshot: Dictionary) -> void:
@@ -80,11 +97,11 @@ func _on_metrics_changed(snapshot: Dictionary) -> void:
 		return
 
 	metrics_label.text = "Runtime %.1fs | Agents %d | Transitions %d | FOV Locks %d | Vector Samples %d" % [
-		snapshot["runtime"],
-		snapshot["agents"],
-		snapshot["transitions"],
-		snapshot["perception_locks"],
-		snapshot["vector_samples"],
+		float(snapshot.get("runtime", 0.0)),
+		int(snapshot.get("agents", 0)),
+		int(snapshot.get("transitions", 0)),
+		int(snapshot.get("perception_locks", 0)),
+		int(snapshot.get("vector_samples", 0)),
 	]
 
 	var counts: Dictionary = snapshot.get("state_counts", {})
@@ -93,17 +110,17 @@ func _on_metrics_changed(snapshot: Dictionary) -> void:
 		int(counts.get("Seek", 0)),
 		int(counts.get("Idle", 0)),
 		float(snapshot.get("average_target_distance", 0.0)),
-		snapshot["latest_vector"],
+		String(snapshot.get("latest_vector", "—")),
 	]
 
-	var review: Dictionary = snapshot["asset_review"]
+	var review: Dictionary = snapshot.get("asset_review", {})
 	var rubric: Dictionary = review.get("rubric", {})
 	var rubric_name := str(rubric.get("name", "Asset Quality Rubric"))
 	var score: float = float(review.get("quality_score", 0.0)) * 100.0
 	asset_label.text = "%s | assets %d | beacons %d | quality %.1f%%" % [
 		rubric_name,
-		review.get("asset_count", 0),
-		review.get("beacon_count", 0),
+		int(review.get("asset_count", 0)),
+		int(review.get("beacon_count", 0)),
 		score,
 	]
 
