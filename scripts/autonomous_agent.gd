@@ -225,7 +225,7 @@ func distance_to_target() -> float:
 	return flat_delta.length()
 
 
-func _transition_to(next_state: int, reason: String) -> void:
+func _transition_to(next_state: AgentState, reason: String) -> void:
 	var previous_state := current_state
 	current_state = next_state
 	state_time = 0.0
