@@ -15,12 +15,14 @@ Core signals:
 - Procedural asset construction with material language and clearance semantics.
 - Runtime evaluation HUD for state counts, vector samples, asset score, and review events.
 - Asset rubric data separated from rendering code.
+- Deterministic headless scenario runner that emits a JSON telemetry snapshot — wired into CI as a real behavior-regression check.
 
 ## Controls
 
 - `F3`: Toggle evaluation HUD.
 - `C`: Cycle review camera angles.
 - `R`: Reset the simulation.
+- `Space`: Pause / resume the simulation.
 
 ## System Architecture
 
@@ -109,18 +111,28 @@ If installed through Winget, restart the terminal so the `godot` alias is availa
 - `scripts/autonomous_agent.gd`: FSM, FOV perception, steering, vector telemetry.
 - `scripts/simulation_director.gd`: Multi-agent orchestration and metrics aggregation.
 - `scripts/debug_hud.gd`: Live evaluation overlay.
+- `scripts/scenario_runner.gd`: Deterministic headless run that emits a JSON metrics snapshot for CI.
 - `data/asset_review_rubric.json`: Asset-quality framework.
 - `docs/TECHNICAL_REVIEW.md`: Deeper reviewer guide.
+- `docs/AUDIT.md`: Notes from the latest code audit.
 
 ## Validation
 
-Headless project boot:
+Headless boot:
 
 ```powershell
 godot --headless --path . --quit
 ```
 
 Expected signal: the console should report three agents transitioning from `Idle` to `Patrol`, followed by the director startup message.
+
+Deterministic 10-second scenario with telemetry snapshot (the same command CI runs):
+
+```powershell
+godot --headless --path . -s scripts/scenario_runner.gd -- --frames=600 --output=scenario_snapshot.json
+```
+
+The resulting `scenario_snapshot.json` contains agent count, transition count, perception locks, vector samples, runtime, state counts, and asset-review metadata. CI asserts on those values, so unintended behavior regressions fail the build.
 
 ## Roadmap
 

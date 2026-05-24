@@ -24,6 +24,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("cycle_camera"):
 		camera_mode = (camera_mode + 1) % 3
 		_apply_camera_mode()
+	if event.is_action_pressed("pause_simulation"):
+		_toggle_pause()
+
+
+func get_director():
+	return director
 
 
 func _configure_rendering() -> void:
@@ -74,11 +80,19 @@ func _build_simulation() -> void:
 
 	hud = DebugHud.new()
 	hud.name = "EvaluationHUD"
+	# HUD must keep drawing while the rest of the tree is paused so the
+	# reviewer can see the "PAUSED" banner without losing telemetry.
+	hud.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(hud)
 	hud.bind(director)
 
 
 func _reset_simulation() -> void:
+	# Coming out of a paused reset would leave the new tree paused too.
+	if get_tree().paused:
+		get_tree().paused = false
+		if hud:
+			hud.set_paused(false)
 	if hud:
 		hud.queue_free()
 	if director:
@@ -87,6 +101,13 @@ func _reset_simulation() -> void:
 		environment.queue_free()
 	await get_tree().process_frame
 	_build_simulation()
+
+
+func _toggle_pause() -> void:
+	var tree := get_tree()
+	tree.paused = not tree.paused
+	if hud:
+		hud.set_paused(tree.paused)
 
 
 func _apply_camera_mode() -> void:
