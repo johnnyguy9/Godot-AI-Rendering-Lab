@@ -1,0 +1,88 @@
+name: Scenario Regression
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  scenario:
+    name: Headless scenario regression
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot binary
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-4.4-stable-linux-headless
+
+      - name: Install Godot 4 (headless)
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot
+          curl -fL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/4.4-stable/Godot_v4.4-stable_linux.x86_64.zip"
+          unzip -o /tmp/godot.zip -d ~/godot
+          chmod +x ~/godot/Godot_v4.4-stable_linux.x86_64
+
+      - name: Import project (writes .godot cache)
+        run: |
+          ~/godot/Godot_v4.4-stable_linux.x86_64 \
+            --headless --path . --import 2>&1 | tee import.log
+          ! grep -E "ERROR|SCRIPT ERROR" import.log
+
+      - name: Run deterministic scenario (600 frames)
+        env:
+          SNAPSHOT_PATH: ${{ github.workspace }}/scenario_snapshot.json
+        run: |
+          ~/godot/Godot_v4.4-stable_linux.x86_64 \
+            --headless --path . \
+            -s scripts/scenario_runner.gd \
+            -- --frames=600 --output="$SNAPSHOT_PATH" \
+            2>&1 | tee scenario.log
+          ! grep -E "ERROR|SCRIPT ERROR" scenario.log
+          test -f "$SNAPSHOT_PATH"
+
+      - name: Assert snapshot is sane
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          path = os.environ.get("SNAPSHOT_PATH") or "scenario_snapshot.json"
+          with open(path) as f:
+              snap = json.load(f)
+          required = {"runtime", "agents", "state_counts", "transitions",
+                      "perception_locks", "vector_samples"}
+          missing = required - set(snap)
+          assert not missing, f"missing keys: {missing}"
+          assert snap["agents"] == 3, f"expected 3 agents, got {snap['agents']}"
+          assert snap["transitions"] > 0, "no FSM transitions observed"
+          assert snap["vector_samples"] > 0, "no steering vectors emitted"
+          # The runtime should be ~10s for 600 frames at 60Hz.
+          assert 8.0 <= snap["runtime"] <= 12.0, f"unexpected runtime: {snap['runtime']}"
+          # State counts should partition the 3 agents exactly.
+          counts = snap.get("state_counts", {})
+          assert sum(int(v) for v in counts.values()) == 3, \
+              f"state counts do not sum to 3: {counts}"
+          print("snapshot OK:", snap["transitions"], "transitions,",
+                snap["perception_locks"], "perception locks,",
+                snap["vector_samples"], "vector samples")
+          PY
+        env:
+          SNAPSHOT_PATH: ${{ github.workspace }}/scenario_snapshot.json
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-output
+          path: |
+            import.log
+            scenario.log
+            scenario_snapshot.json
